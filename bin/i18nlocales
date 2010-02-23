@@ -1,0 +1,51 @@
+#!/usr/bin/env ruby
+
+require "open-uri"
+require "rubygems"
+require "hpricot"
+require "thor"
+
+class I18nlocales < Thor
+  map "-l" => :list, "-i" => :install
+
+  REMOTE_LOCATION = 
+    {
+      :list => 'http://github.com/svenfuchs/rails-i18n/tree/master/rails/locale/',
+      :file => 'http://github.com/svenfuchs/rails-i18n/raw/master/rails/locale/###'
+    }
+
+  desc "list [SEARCH]", "list all of the available locales, limited by SEARCH"
+  def list(search_term="")
+    search_term = Regexp.new(".*#{search_term.sub(File.extname(search_term), '')}.*.(yml|rb)", "i")
+
+    doc = Hpricot(open(REMOTE_LOCATION[:list]))
+    (doc / "#browser tr").each do |item|
+      unless (item / "td.content a").empty?
+        item_name = (item / "td.content a").inner_html
+        #item_age = (item / "td.age span").inner_html
+        
+        puts "#{item_name}" if item_name =~ search_term
+      end
+    end
+  end
+
+  desc "install LOCALE", "install one of the available locales"
+  def install file
+    locale = if File.extname(file).empty?
+      "#{File.basename(file)}.yml"
+    else
+      File.basename(file)
+    end
+
+    remote_file = open(REMOTE_LOCATION[:file].gsub('###', locale))
+
+    File.open(File.join(File.dirname(file), locale), "w") do |new_file|
+      new_file << remote_file.read
+    end
+
+  rescue OpenURI::HTTPError
+    puts "#{locale} Not Found"
+  end
+end
+
+I18nlocales.start
